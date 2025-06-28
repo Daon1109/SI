@@ -5,6 +5,7 @@ from PIL import Image
 from torchvision import transforms
 import torch.nn.functional as F
 import os
+import SI_modules as sim
 
 
 # 전처리 함수
@@ -26,14 +27,38 @@ model, preprocess = clip.load("ViT-B/32", device=device)
 
 
 
-# 입력
-input_folder_path = 'C:/Coding/ssipduck_intelligence/SI_DB/inputs/'             # 이미지 경로 리스트화
+# 애니 제목 입력(선택)
+ani_input_choice = input("에니메이션 제목으로 검색하시겠습니까?(y/n): ")
+if ani_input_choice == "Y" or ani_input_choice == "y":
+    ani_title_input = input("애니메이션 제목을 입력하세요: ")
+    result_url = sim.get_anisearch_url(ani_title_input)
+    print(f"\n검색된 URL: {result_url}")
+
+    # 크롤링 및 다운로드
+    save_path = os.path.join("C:/Coding/doodles/ssipduck_intelligence/SI_DB/inputs/")
+    image_links, title = sim.get_image_links_from_screenshots_page(result_url+"/screenshots/", max_links=8)
+    if image_links:
+        print("이미지 다운로드 중...")
+        sim.download_images_parallel(image_links, save_dir=save_path)
+elif ani_input_choice == "N" or ani_input_choice == "n":
+    pass
+else:
+    print("ERROR: Wrong Input")
+
+    
+
+
+# 이미지 입력
+input_folder_path = 'C:/Coding/doodles/ssipduck_intelligence/SI_DB/inputs/'             # 이미지 경로 리스트화
 image_paths = os.listdir(input_folder_path)
 for i in range(len(image_paths)):
     image_paths[i] = input_folder_path + str(image_paths[i])
 
 img_tensors = [preprocess(Image.open(p)) for p in image_paths]      # 전처리 후 텐서 리스트
 batch = torch.stack(img_tensors).to(device)         # 리스트로 만든 애들 배치로 묶기
+
+
+
 
 # 벡터 변환
 with torch.no_grad():       # 역전파용 메모리 저장 방지
@@ -47,7 +72,7 @@ input_mean = input_features.mean(dim=0, keepdim=True)       # 이거 방식은 �
 
 
 # embedded DB 불러오기
-recommend_vectors = torch.load("C:/Coding/ssipduck_intelligence/SI_DB/recommends/embeddings/recommend_vectors.pt")  # 딕셔너리 형태     e.g. {'제목': tensor([512]), }
+recommend_vectors = torch.load("C:/Coding/doodles/ssipduck_intelligence/SI_DB/recommends/embeddings/recommend_vectors.pt")  # 딕셔너리 형태     e.g. {'제목': tensor([512]), }
 anime_names = list(recommend_vectors.keys())
 anime_features = torch.stack([recommend_vectors[name] for name in anime_names]).to(device)  # DB에 있는 벡터 전부 쌓기
 
@@ -58,8 +83,8 @@ similarity = torch.matmul(anime_norm, input_norm.T).squeeze()   # 계산 결과:
 
 # 유사도 정렬 및 출력
 sorted_scores, org_index = similarity.sort(descending=True)       # 텐서라서 원래 인덱스(org_index) 추적 가능
-for j in range(5):
+print("\nTop 10")
+for j in range(10):
     rec_ani_idx = org_index[j].item()
-    print("\nTop 5")
-    print(f"{j+1}. {anime_names[rec_ani_idx]} (cosine similarity: {sorted_scores[j].item():.4f})")
+    print(f"{j+1}. {sim.decode_filename(anime_names[rec_ani_idx])} (cosine similarity: {sorted_scores[j].item():.4f})")     # 파일 이름 디코딩 여기서 함
 
