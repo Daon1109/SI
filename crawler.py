@@ -11,20 +11,36 @@ import os
 def crawl_anisearch_bulk(start_index: int, end_index: int):         # function(시작 인덱스, 종료 인덱스)
     done_indexes = sim.load_done_indexes()
 
+    driver = sim.create_driver()
+    cnt = 0
+
     for anime_id in range(start_index, end_index + 1):
+
+        cnt = cnt + 1
+
+        # 중복 크롤링 방지
         if anime_id in done_indexes:
             print(f"[{anime_id}] - 이미 완료됨. 건너뜀.")
             continue
 
+        # 드라이버 종료 후 재시작(메모리 누수 방지)
+        if cnt >= 200:
+            print(f"\n200개 처리 완료: driver 재시작")
+            driver.quit()
+            time.sleep(1)
+            driver = sim.create_driver()
+            cnt = 0
+            
+        # 메인 크롤링 코드
         try:
             url = f"https://www.anisearch.com/anime/{anime_id}/screenshots"
             print(f"\n[{anime_id}] - 크롤링 시작: {url}")
 
-            image_links, title = sim.get_image_links_from_screenshots_page(url, max_links=8)
+            image_links, title = sim.get_image_links_from_screenshots_page(driver, url, max_links=8)
 
             if not image_links:
                 print(f"[{anime_id}] - 이미지 없음. 건너뜀.")
-                sim.log_done_index(anime_id)
+                sim.log_errored_index(anime_id)
                 continue
 
             slug = sim.encode_filename(title)
@@ -43,11 +59,12 @@ def crawl_anisearch_bulk(start_index: int, end_index: int):         # function(�
         except Exception as e:
             print(f"[{anime_id}] - 오류 발생: {e}")
             time.sleep(1)
+            sim.log_errored_index(anime_id)
             continue
 
 
 # execution
-crawl_anisearch_bulk(2001, 5000)
+crawl_anisearch_bulk(2013, 5000)
 
 
 
