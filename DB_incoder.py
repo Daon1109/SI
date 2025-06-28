@@ -7,6 +7,7 @@ import os
 import torch.nn.functional as F
 
 
+
 # CLIP settings
 if torch.cuda.is_available():
     device = "cuda" 
@@ -14,14 +15,14 @@ else:
     device = "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
+
+
+
 # 경로
-# base_path = "C:/Coding/ssipduck_intelligence/SI_DB/recommends/originals"      # recommend_images/애니제목/이미지들
-base_path = "C:/Coding/ssipduck_intelligence/SI_DB/test_rcmd"
-output_path = "C:/Coding/ssipduck_intelligence/SI_DB/recommends/embeddings/recommend_vectors.pt"      # 이미지 버전별로 이거 수정하기
+base_path = "C:/Coding/ssipduck_intelligence/SI_DB/recommends/originals"      # recommend_images/애니제목/이미지들
+output_path = "C:/Coding/doodles/ssipduck_intelligence/SI_DB/recommends/embeddings/recommend_vectors.pt"      # 이미지 버전별로 이거 수정하기
 # 저장용 딕셔너리
 recommend_vectors = {}
-
-
 
 
 # 애니 폴더별 처리
@@ -31,7 +32,7 @@ for anime_name in os.listdir(base_path):
         continue  # 혹시 폴더가 아닌 파일이 있을 경우 생략
 
     # 이미지 불러오기
-    image_paths = [os.path.join(anime_folder, f) for f in os.listdir(anime_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    image_paths = [os.path.join(anime_folder, f) for f in os.listdir(anime_folder) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
 
     if len(image_paths) == 0:
         continue  # 이미지가 없다면 건너뜀
