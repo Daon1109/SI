@@ -85,56 +85,65 @@ def slugmaker(anime_title):     # 애니 이름 slug 형태로 바꿔줌
 
 
 
-def get_image_links_from_screenshots_page(url: str, max_links: int = 12) -> list[str]:      # screenshots 페이지 열고 이미지 링크랑 애니제목만 추출(selenium 기반)
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    driver = webdriver.Chrome(options=options)
+def get_image_links_from_screenshots_page(driver, url: str, max_links: int) -> tuple[list[str], str]:       # Selenium driver를 받아서 이미지 링크랑 제목 크롤링
 
     title = None
-    try:
+    links = []
 
-        # 애니제목 추출
+    try:
+        print(f"\n페이지 로딩 중: {url}")
         driver.get(url)
+
+        # 제목 추출
         try:
             WebDriverWait(driver, 5).until(
                 EC.presence_of_element_located((By.ID, "htitle"))
             )
             title_elem = driver.find_element(By.ID, "htitle")
-            title = title_elem.text
-            print(f"\n애니 제목 추출 완료: {title}")
+            title = title_elem.text.strip()
+            print(f"애니 제목 추출 완료: {title}")
         except TimeoutException:
-            print("\n제목 요소 로딩 실패 (htitle 없음)")
+            print("제목 요소 로딩 실패 (htitle 없음)")
         except Exception as e:
-            print(f"\n제목 추출 중 예외 발생: {e}")
-
+            print(f"제목 추출 중 예외 발생: {e}")
 
         # 이미지 링크 추출
-        print("\n페이지 로딩 중...")
-        # a.zoom 요소가 렌더링될 때까지 최대 10초 대기
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.zoom"))
-        )
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.zoom"))
+            )
+            a_tags = driver.find_elements(By.CSS_SELECTOR, "a.zoom")
 
-        a_tags = driver.find_elements(By.CSS_SELECTOR, "a.zoom")
-        links = []
-        for a in a_tags:
-            href = a.get_attribute("href")
-            if href and href.endswith(".webp"):
-                links.append(href)
-                if len(links) >= max_links:
-                    break
+            for a in a_tags:
+                href = a.get_attribute("href")
+                if href and href.endswith(".webp"):
+                    links.append(href)
+                    if len(links) >= max_links:
+                        break
 
-        if not links:
-            print("\n이미지 링크를 찾지 못했습니다.")
-        else:
-            print(f"\n{len(links)}개의 이미지 링크 수집 완료")
+            if not links:
+                print("이미지 링크를 찾지 못했습니다.")
+            else:
+                print(f"{len(links)}개의 이미지 링크 수집 완료")
 
+        except TimeoutException:
+            print("이미지 요소 로딩 실패 (a.zoom 없음)")
+        except Exception as e:
+            print(f"이미지 추출 중 예외 발생: {e}")
 
-    finally:
-        driver.quit()
-        
+    except Exception as e:
+        print(f"페이지 접근 중 오류: {e}")
+
     return links, title
+
+
+
+def create_driver() -> webdriver.Chrome:        # 드라이버 하나 크롤링할때마다 껐다켰다 안하게 재사용할 수 있도록 만듦
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    return webdriver.Chrome(options=options)
 
 
 
@@ -194,6 +203,7 @@ def decode_filename(encoded: str) -> str:             # 파일명 디코딩 함�
 # 경로 설정
 SAVE_ROOT = "C:/Coding/doodles/ssipduck_intelligence/SI_DB/recommends/originals"
 DONE_LOG_PATH = "C:/Coding/doodles/ssipduck_intelligence/SI_DB/crawled_animes.txt"
+ERROR_LOG_PATH = "C:/Coding/doodles/ssipduck_intelligence/SI_DB/not_crawled_animes.txt"
 
 
 def load_done_indexes() -> set[int]:            # 중간 저장된 인덱스 불러오기
@@ -203,8 +213,12 @@ def load_done_indexes() -> set[int]:            # 중간 저장된 인덱스 불
         return set(int(line.strip()) for line in f if line.strip().isdigit())
 
 
-def log_done_index(anime_id: int):              # 완료한 애니메이션 인덱스 기록
+def log_done_index(anime_id: int):              # 크롤링 완료한 애니메이션 인덱스 기록
     with open(DONE_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(f"{anime_id}\n")
+
+def log_errored_index(anime_id: int):              # 이미지 없거나 에러 떠서 크롤링 못한 애니메이션 인덱스 기록
+    with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
         f.write(f"{anime_id}\n")
 
 
